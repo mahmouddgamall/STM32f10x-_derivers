@@ -1,0 +1,57 @@
+/**************************************************** 
+ 	 Author: Mahmoud Gamal
+************************************************/
+#ifndef AFIO_INTERFACE_H
+#define AFIO_INTERFACE_H
+
+#define AFIO_ADC2_ETRGREG_REMAP		0x00100000		
+#define AFIO_ADC2_ETRGINJ_REMAP		0x00080000
+#define AFIO_TIM5CH4_IREMAP			0x00040000
+#define AFIO_CAN_REMAP				0x00004000
+#define AFIO_TIM4_REMAP				0x00001000	
+#define AFIO_TIM3_REMAP				0x00000800	
+#define AFIO_TIM2_PARTIAL_REMAP		0x00000200	
+#define AFIO_TIM2_FULL_REMAP		0x00000300	
+#define AFIO_TIM1_PARTIAL_REMAP		0x00000010	
+#define AFIO_TIM1_FULL_REMAP		0x00000030
+#define AFIO_USART1_REMAP			0x00000004
+#define AFIO_I2C1_REMAP				0X00000002
+#define AFIO_SPI1_REMAP				0X00000001
+
+
+#define	AFIO_EXTI_PIN0				0x00000
+#define	AFIO_EXTI_PIN1				0x00001
+#define	AFIO_EXTI_PIN2				0x00002
+#define	AFIO_EXTI_PIN3				0x00003
+#define	AFIO_EXTI_PIN4				0x10000
+#define	AFIO_EXTI_PIN5				0x10001
+#define	AFIO_EXTI_PIN6				0x10002
+#define	AFIO_EXTI_PIN7				0x10003
+#define	AFIO_EXTI_PIN8				0x20000
+#define	AFIO_EXTI_PIN9				0x20001
+#define	AFIO_EXTI_PIN10				0x20002
+#define	AFIO_EXTI_PIN11				0x20003
+#define	AFIO_EXTI_PIN12				0x30000
+#define	AFIO_EXTI_PIN13				0x30001
+#define	AFIO_EXTI_PIN14				0x30002
+#define	AFIO_EXTI_PIN15				0x30003
+
+#define	AFIO_EXTI_PORTA				0
+#define	AFIO_EXTI_PORTB				1
+#define	AFIO_EXTI_PORTC				2
+#define	AFIO_EXTI_PORTD				3
+#define	AFIO_EXTI_PORTE				4
+#define	AFIO_EXTI_PORTF				5
+#define	AFIO_EXTI_PORTG				6
+
+		
+
+void AFIO_voidRemapEnable(u32 AFIO_REMAP_PERIPHERAL);
+void AFIO_voidRemapDisable(u32 AFIO_REMAP_PERIPHERAL);
+
+void AFIO_voidSetEXTIport(u8 AFIO_EXTI_PORT, u32 AFIO_EXTI_PIN);
+
+
+
+
+#endif
