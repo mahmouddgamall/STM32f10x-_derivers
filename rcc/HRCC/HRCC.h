@@ -2,21 +2,21 @@
 #define HRCC_H
 
 #define		HRCC_SYS_CLK_8MHz					(u8)0x0
-#define		HRCC_SYS_CLK_16MHz				(u8)0x1
-#define		HRCC_SYS_CLK_24MHz				(u8)0x2
-#define		HRCC_SYS_CLK_32MHz				(u8)0x3
-#define		HRCC_SYS_CLK_40MHz				(u8)0x4
-#define		HRCC_SYS_CLK_48MHz				(u8)0x5
-#define		HRCC_SYS_CLK_56MHz				(u8)0x6
-#define		HRCC_SYS_CLK_64MHz				(u8)0x7
-#define		HRCC_SYS_CLK_72MHz				(u8)0x8
-#define		HRCC_SYS_CLK_12MHz				(u8)0x12
-#define		HRCC_SYS_CLK_20MHz				(u8)0x14
-#define		HRCC_SYS_CLK_28MHz				(u8)0x16
-#define		HRCC_SYS_CLK_36MHz				(u8)0x18
-#define		HRCC_SYS_CLK_44MHz				(u8)0x1A
-#define		HRCC_SYS_CLK_52MHz				(u8)0x1B
-#define		HRCC_SYS_CLK_60MHz				(u8)0x1C
+#define		HRCC_SYS_CLK_16MHz					(0X0000F)
+#define		HRCC_SYS_CLK_24MHz					(0X4000F)
+#define		HRCC_SYS_CLK_32MHz					(0X8000F)
+#define		HRCC_SYS_CLK_40MHz					(0XC000F)
+#define		HRCC_SYS_CLK_48MHz					(0X10000F)
+#define		HRCC_SYS_CLK_56MHz					(0X14000F)
+#define		HRCC_SYS_CLK_64MHz					(0X18000F)
+#define		HRCC_SYS_CLK_72MHz					(0X1C000F)
+#define		HRCC_SYS_CLK_12MHz					(0X4000E)
+#define		HRCC_SYS_CLK_20MHz					(0XC000E)
+#define		HRCC_SYS_CLK_28MHz					(0X14000E)
+#define		HRCC_SYS_CLK_36MHz					(0X1C000E)
+#define		HRCC_SYS_CLK_44MHz					(0X24000E)
+#define		HRCC_SYS_CLK_52MHz					(0X2C000E)
+#define		HRCC_SYS_CLK_60MHz					(0X24000E)
 
 #define		HRCC_DMA1EN						(u64)0xA00000001
 #define		HRCC_DMA2EN						(u64)0xA00000002
@@ -130,7 +130,7 @@ HRCC_SYS_CLK_52MHz
 HRCC_SYS_CLK_60MHz
 */
 
-extern void HRCC_voidSetSystemClockSpeed(u8 HRCC_SYS_CLK);
+extern void HRCC_voidSetSystemClockSpeed(u32 HRCC_SYS_CLK);
 
 
 /*

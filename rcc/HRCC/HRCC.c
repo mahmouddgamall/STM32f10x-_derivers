@@ -3,7 +3,7 @@
 #include "rcc_cnfg.h"
 
 #include "HRCC.h"
-extern void HRCC_voidSetSystemClockSpeed(u8 HRCC_SYS_CLK)
+extern void HRCC_voidSetSystemClockSpeed(u32 HRCC_SYS_CLK)
 {
 	rcc_voidEnableClock(RCC_HSE_ENABLE);
 	rcc_voidSelectSysClock(RCC_HSE_SW);
@@ -12,59 +12,16 @@ extern void HRCC_voidSetSystemClockSpeed(u8 HRCC_SYS_CLK)
 
 	if(HRCC_SYS_CLK !=0)
 	{
-		if((HRCC_SYS_CLK & 0xF0) == 0)
+		if((HRCC_SYS_CLK & 0xF) == 0xF)
 		{
 			rcc_voidPllSource(RCC_PLLSRC_HSE);
 		}
-		else if((HRCC_SYS_CLK & 0xF0) == 1)
+		else if((HRCC_SYS_CLK & 0xF) == 0xE)
 		{
 			rcc_voidPllSource(RCC_PLLSRC_HSEDIV2);
 		}
+		rcc_voidPllMultiplier(HRCC_SYS_CLK & 0xFFFFFFF0);
 		
-		if((HRCC_SYS_CLK & 0x0F) == 1)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL2);
-		}
-		else if((HRCC_SYS_CLK & 0x0F) == 2)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL3);
-		}
-		else if((HRCC_SYS_CLK & 0x0F) == 3)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL4);
-		}
-		else if((HRCC_SYS_CLK & 0x0F) == 4)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL5);
-		}
-		else if((HRCC_SYS_CLK & 0x0F) == 5)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL6);
-		}
-		else if((HRCC_SYS_CLK & 0x0F) == 6)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL7);
-		}
-		else if((HRCC_SYS_CLK & 0x0F) == 7)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL8);
-		}
-		else if((HRCC_SYS_CLK & 0x0F) == 8)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL9);
-		}
-		else if((HRCC_SYS_CLK & 0x0F) == 0xA)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL11);
-		}
-		else if((HRCC_SYS_CLK & 0x0F) == 0xB)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL13);
-		}
-		else if((HRCC_SYS_CLK & 0x0F) == 0xC)
-		{
-			rcc_voidPllMultiplier(RCC_PLLMUL15);
-		}
 		rcc_voidEnableClock(RCC_PLL_ENABLE);
 		rcc_voidSelectSysClock(RCC_PLL_SW);
 	}
