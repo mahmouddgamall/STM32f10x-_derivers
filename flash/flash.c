@@ -1,23 +1,36 @@
 /**************************************************** 
  	 Author: Mahmoud Gamal
  	 Version: 1.0
-************************************************/
+ ************************************************/
 #include "std_types.h"
-#include "bit_math.h"
 #include "flash.h"
 
 
 #define	FLASH_KEY1					0x45670123
 #define	FLASH_KEY2					0xCDEF89AB
-#define	FLASH_ERASE_VALUE			0xFF
+#define	FLASH_ERASE_VALUE			0xFFFF
 
 #define FLASH_SR_BSY_FLAG			0x00000001
 
 #define	FLASH_CR_LOCK				0x00000080
 #define	FLASH_CR_ENABLE_PROGRAM		0x00000001
+#define FLASH_CR_DISABLE_PROGRAM	0xFFFFFFFE
 #define	FLASH_CR_ENABLE_ERASE_PAGE	0x00000002
+#define FLASH_CR_DISABLE_ERASE_PAGE	0xFFFFFFFD
 #define	FLASH_CR_ENABLE_ERASE_FLASH	0x00000003
 #define FLASH_CR_START_BIT			0x00000040
+
+#define FLASH_START_ADDRESS (u32*)0x08000000
+#define FLASH_END_ADDRESS	(u32*)0x08010000
+
+#define RAM_START_ADDRESS   (u32*)0x20000000
+#define RAM_END_ADDRESS 	(u32*)0x20005000
+
+
+
+#define ISVALID_DESTINATION_ADDRESS(Address) ((Address >= FLASH_START_ADDRESS) && (Address <= FLASH_END_ADDRESS))
+#define ISVALID_SOURCE_ADDRESS(sourceAddress) (((sourceAddress >= FLASH_START_ADDRESS) && (sourceAddress <= FLASH_END_ADDRESS))|| ((sourceAddress >= RAM_START_ADDRESS) && (sourceAddress <= RAM_END_ADDRESS)))
+
 
 
 
@@ -35,11 +48,11 @@ typedef struct
 }FLASH_t;
 
 
-const FLASH_t * FLASH = (volatile const FLASH_t *)0x40022000;
+volatile FLASH_t * FLASH = (volatile  FLASH_t *)0x40022000;
 
 void FLASH_unlockRegisters(void)
 {
-	if((FLASH->CR & FLASH_CR_LOCK) == 1)
+	if((FLASH->CR & FLASH_CR_LOCK))
 	{
 		FLASH->KEYR = FLASH_KEY1;
 		FLASH->KEYR = FLASH_KEY2;
@@ -56,62 +69,105 @@ void FLASH_lockRegisters(void)
 ErrorStatus FLASH_eraseSection(u32* startAddress)
 {
 	u8 state;
-	FLASH->CR |= FLASH_CR_ENABLE_ERASE_PAGE;
-	FLASH->AR = startAddress;
-	FLASH->CR |= FLASH_CR_START_BIT;
-	while(FLASH->SR & FLASH_SR_BSY_FLAG);
-	if(*startAddress == FLASH_ERASE_VALUE)
+	if((FLASH->CR & FLASH_CR_LOCK) == 0)
 	{
-		state = OK;
+		FLASH->CR |= FLASH_CR_ENABLE_ERASE_PAGE;
+		FLASH->AR = (u32)startAddress;
+		FLASH->CR |= FLASH_CR_START_BIT;
+		while(FLASH->SR & FLASH_SR_BSY_FLAG);
+		if(*startAddress == FLASH_ERASE_VALUE)
+		{
+			state = OK;
+		}
+		else
+		{
+			state = NOK;
+		}
+		FLASH->CR &= FLASH_CR_DISABLE_ERASE_PAGE;
+
 	}
 	else
 	{
-		state = NOK;
+		state = FLASH_LOCKED;
 	}
 	return state;
 
 }
 void FLASH_eraseFlash(void)
 {
-	FLASH->CR |= FLASH_CR_ENABLE_ERASE_FLASH;
-	FLASH->AR = startAddress;
-	FLASH->CR |= FLASH_CR_START_BIT;
+	if((FLASH->CR & FLASH_CR_LOCK) == 0)
+	{
+		FLASH->CR |= FLASH_CR_ENABLE_ERASE_FLASH;
+		FLASH->CR |= FLASH_CR_START_BIT;
+	}
 }
 
 
-void FLASH_writeHalfWord(u32* destinationAddress, u32* sourceAddress)
+
+static ErrorStatus FLASH_writeHalfWord(u16* destinationAddress, u16* sourceAddress)
 {
 	u8 state = OK;
-	if( ((destinationAddress >= 0x08000000) && (destinationAddress <= 0x08010000)) && (((sourceAddress >= 0x08000000) && (sourceAddress <= 0x08010000))|| ((sourceAddress >= 0x20000000) && (sourceAddress <= 0x20005000))) )
+	if((FLASH->CR & FLASH_CR_LOCK) == 0)
 	{
-		if(*destinationAddress == FLASH_ERASE_VALUE)
+		if(ISVALID_DESTINATION_ADDRESS(destinationAddress) && ISVALID_SOURCE_ADDRESS(sourceAddress))
 		{
-			FLASH->CR |= FLASH_CR_ENABLE_PROGRAM;
-			(u16)*destinationAddress = (u16)*sourceAddress;
 
-			while(FLASH->SR & FLASH_SR_BSY_FLAG);
-			if((u16)*destinationAddress == (u16)*sourceAddress)
+			if((*destinationAddress) == FLASH_ERASE_VALUE)
 			{
-				state = OK;
+
+				FLASH->CR |= FLASH_CR_ENABLE_PROGRAM;
+				*destinationAddress = (u16)(*sourceAddress);
+
+				while(FLASH->SR & FLASH_SR_BSY_FLAG);
+				if((u16)*destinationAddress == (u16)*sourceAddress)
+				{
+					trace_printf("%d",(u16)*destinationAddress );
+					state = OK;
+				}
+				else
+				{
+					state = NOK;
+				}
 			}
+
 			else
 			{
 				state = NOK;
 			}
-		}
 
+		}
 		else
 		{
-			state = NOK;
-		}	
+			state = INVALID_INPUT;
+		}
+		FLASH->CR &= FLASH_CR_DISABLE_PROGRAM;
 	}
-
 	else
 	{
-		state = INVALIDINPUT
+		state = FLASH_LOCKED;
 	}
-
-
 	return state;
 }
 
+ErrorStatus FLASH_writeData(u16* destinationAddress, u16* sourceAddress, u16 size)
+{
+	u8 state = OK;
+
+	for(u16 i = 0; i < size ; i ++)
+	{
+		state |= FLASH_writeHalfWord(destinationAddress+i,sourceAddress+i);
+	}
+
+	return state;
+}
+ErrorStatus FLASH_writeDataStaticSource(u16* destinationAddress, u16* sourceAddress, u16 size)
+{
+	u8 state = OK;
+
+	for(u16 i = 0; i < size ; i ++)
+	{
+		state |= FLASH_writeHalfWord(destinationAddress+i,sourceAddress);
+	}
+
+	return state;
+}

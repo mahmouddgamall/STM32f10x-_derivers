@@ -5,6 +5,7 @@
 #ifndef FLASH_H
 #define FLASH_H
 
+#define FLASH_LOCKED				6
 
 void FLASH_unlockRegisters(void);
 void FLASH_lockRegisters(void);
@@ -12,7 +13,10 @@ void FLASH_lockRegisters(void);
 ErrorStatus FLASH_eraseSection(u32* startAddress);
 void FLASH_eraseFlash(void);
 
-void FLASH_writeHalfWord(u32* destinationAddress, u32* sourceAddress);
+static ErrorStatus FLASH_writeHalfWord(u16* destinationAddress, u16* sourceAddress);
+ErrorStatus FLASH_writeData(u16* destinationAddress, u16* sourceAddress, u16 size);
+ErrorStatus FLASH_writeDataStaticSource(u16* destinationAddress, u16* sourceAddress, u16 size);
+
 
 
 #endif
