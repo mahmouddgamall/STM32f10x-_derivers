@@ -1,5 +1,5 @@
 /**********************************************************************************************
-Author :Mohamed Ibrahem, Mahmoud Gamal
+Author :Mohamed Ibrahem
 Version:1.0
 Date:5 April 2020
 Description:This Source file is used to interface with the HUART module in STM32f10x evaluation kit
@@ -9,7 +9,6 @@ Description:This Source file is used to interface with the HUART module in STM32
 
 #include"NVIC_interface.h"
 #include"GPIO_interface.h"
-
 
 
 #include "UART_interface.h"
@@ -61,11 +60,10 @@ else
 
 u8 HUART_errTransmit(u32 UART_CHANNEL,u8* Copy_pu8Data, u16 Copy_u16Size)
 {
-	UART_CFG_t*UART_cfg=Get_UART_CnfStruct();
+
 	return UART_errTransmit(UART_CHANNEL,Copy_pu8Data,Copy_u16Size);
 }
 u8 HUART_errRecieve(u32 UART_CHANNEL,u8* Copy_pu8Data, u16 Copy_u16ize)
 {
-	UART_CFG_t*UART_cfg=Get_UART_CnfStruct();
 	return UART_errRecieve(UART_CHANNEL,Copy_pu8Data,  Copy_u16ize);
 }

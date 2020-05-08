@@ -1,5 +1,5 @@
 /**********************************************************************************************
-Author :Mohamed Ibrahem, Mahmoud Gamal
+Author :Mohamed Ibrahem
 Version:1.0
 Date:12 April 2020
 Description:This Source file is used to interface with the UART module in STM32f10x evaluation kit
@@ -10,21 +10,22 @@ Description:This Source file is used to interface with the UART module in STM32f
 
 
 
-
-
 const UART_CFG_t UART_cfg [UART_MODULES_NUM]={
 		{
 				.Parity      = UART_CR1_PARITY_STATE ,
 				.Mode        = UART_MODE             ,
 				.DateSize    = UART_CR1_DATA_BITS_NUM,
 				.StopBit     = UART_CR2_STOP_BIT     ,
+				.LINstate 	 = UART_LIN_ENABLE		 ,
 				.BaudRate    = UART_BAUDRATE_4800
 		},
+
 		{
 				.Parity      = UART_CR1_PARITY_STATE ,
 				.Mode        = UART_MODE             ,
 				.DateSize    = UART_CR1_DATA_BITS_NUM,
 				.StopBit     = UART_CR2_STOP_BIT     ,
+				.LINstate 	 = UART_LIN_DISABLE		 ,
 				.BaudRate    = UART_BAUDRATE_9600
 		},
 		{
@@ -32,6 +33,7 @@ const UART_CFG_t UART_cfg [UART_MODULES_NUM]={
 				.Mode        = UART_MODE             ,
 				.DateSize    = UART_CR1_DATA_BITS_NUM,
 				.StopBit     = UART_CR2_STOP_BIT     ,
+				.LINstate 	 = UART_LIN_DISABLE		 ,
 				.BaudRate    = UART_BAUDRATE_9600
 		}
 
