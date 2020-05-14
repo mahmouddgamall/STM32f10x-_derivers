@@ -77,6 +77,24 @@ RCC deriver for stm32f10x
 #define	RCC_TIM9EN_APB2ENR						(u32)0x80000
 #define	RCC_TIM10EN_APB2ENR						(u32)0x100000
 #define	RCC_TIM11EN_APB2ENR						(u32)0x200000
+#define	RCC_AFIOEN_APB2RST						(u8)1
+#define	RCC_IOPAEN_APB2RST						(u8)4
+#define	RCC_IOPBEN_APB2RST						(u8)8
+#define	RCC_IOPCEN_APB2RST						(u8)16
+#define	RCC_IOPDEN_APB2RST						(u8)32
+#define	RCC_IOPEEN_APB2RST						(u8)64
+#define	RCC_IOPFEN_APB2RST						(u8)128
+#define	RCC_IOPGEN_APB2RST						(u32)256
+#define	RCC_ADC1EN_APB2RST						(u32)512
+#define	RCC_ADC2EN_APB2RST						(u32)1024
+#define	RCC_TIM1EN_APB2RST						(u32)2048
+#define	RCC_SPI1EN_APB2RST						(u32)4096
+#define	RCC_TIM8EN_APB2RST						(u32)8192
+#define	RCC_USART1EN_APB2RST					(u32)0x4000
+#define	RCC_ADC3EN_APB2RST						(u32)0x8000
+#define	RCC_TIM9EN_APB2RST						(u32)0x80000
+#define	RCC_TIM10EN_APB2RST						(u32)0x100000
+#define	RCC_TIM11EN_APB2RST						(u32)0x200000
 #define	RCC_AFIOEN_APB2ENR_DISABLE		(u32)0xFFFFFFFE
 #define	RCC_IOPAEN_APB2ENR_DISABLE		(u32)0xFFFFFFFB
 #define	RCC_IOPBEN_APB2ENR_DISABLE		(u32)0xFFFFFFF7
@@ -115,6 +133,26 @@ RCC deriver for stm32f10x
 #define	RCC_BKPEN_APB1ENR							(u32)0x8000000
 #define	RCC_PWREN_APB1ENR							(u32)0x10000000
 #define	RCC_DACEN_APB1ENR							(u32)0x20000000
+#define	RCC_TIM2EN_APB1RST						(u8)1
+#define	RCC_TIM3EN_APB1RST						(u8)2
+#define	RCC_TIM4EN_APB1RST						(u8)4
+#define	RCC_TIM5EN_APB1RST						(u8)8
+#define	RCC_TIM6EN_APB1RST						(u8)16
+#define	RCC_TIM7EN_APB1RST						(u8)32
+#define	RCC_TIM12EN_APB1RST						(u8)64
+#define	RCC_TIM13EN_APB1RST						(u8)128
+#define	RCC_TIM14EN_APB1RST						(u32)256
+#define	RCC_WWDEN_APB1RST							(u32)0x800
+#define	RCC_SPI2EN_APB1RST						(u32)0x4000
+#define	RCC_USART2EN_APB1RST					(u32)0x20000
+#define	RCC_USART3EN_APB1RST					(u32)0x40000
+#define	RCC_I2C1EN_APB1RST						(u32)0x200000
+#define	RCC_I2C2EN_APB1RST						(u32)0x400000
+#define	RCC_USBEN_APB1RST							(u32)0x800000
+#define	RCC_CANEN_APB1RST							(u32)0x2000000
+#define	RCC_BKPEN_APB1RST							(u32)0x8000000
+#define	RCC_PWREN_APB1RST							(u32)0x10000000
+#define	RCC_DACEN_APB1RST							(u32)0x20000000
 #define	RCC_TIM2EN_APB1ENR_DISABLE		(u32)0xFFFFFFFE
 #define	RCC_TIM3EN_APB1ENR_DISABLE		(u32)0xFFFFFFFD
 #define	RCC_TIM4EN_APB1ENR_DISABLE		(u32)0xFFFFFFFB
@@ -271,6 +309,9 @@ RCC_TIM11EN_APB2ENR
 
 void rcc_voidEnablePeripheralAPB2 (u32 peripheral);
 
+void rcc_voidResetPeripheralAPB2 (u32 peripheral);
+
+
 /*
 RCC_AFIOEN_APB2ENR_DISABLE	
 RCC_IOPAEN_APB2ENR_DISABLE	
@@ -323,6 +364,7 @@ RCC_DACEN_APB1ENR
 
 void rcc_voidEnablePeripheralAPB1 (u32 peripheral);
 
+void rcc_voidResetPeripheralAPB1 (u32 peripheral);
 
 
 

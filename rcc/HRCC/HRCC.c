@@ -49,6 +49,26 @@ extern u8 HRCC_errEnablePeripheral(u64 HRCC_Peripheral)
 	return status;
 }
 
+
+extern u8 HRCC_errResetPeripheral(u64 HRCC_Peripheral)
+{
+	u8 status = OK;
+	
+	if((HRCC_Peripheral & 0xF00000000)==0xC00000000)
+	{
+		rcc_voidResetPeripheralAPB2((u32) HRCC_Peripheral);
+	}
+	else if((HRCC_Peripheral & 0xF00000000)==0xE00000000)
+	{
+		rcc_voidResetPeripheralAPB1((u32) HRCC_Peripheral);
+	}
+	else
+	{
+		status = NOK;
+	}
+	return status;
+}
+
 extern u8 HRCC_errDisablePeripheral(u64 HRCC_Peripheral)
 {
 	u8 status = OK;
