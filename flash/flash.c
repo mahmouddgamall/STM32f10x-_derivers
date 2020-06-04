@@ -121,7 +121,6 @@ static ErrorStatus FLASH_writeHalfWord(u16* destinationAddress, u16* sourceAddre
 				while(FLASH->SR & FLASH_SR_BSY_FLAG);
 				if((u16)*destinationAddress == (u16)*sourceAddress)
 				{
-					trace_printf("%d",(u16)*destinationAddress );
 					state = OK;
 				}
 				else

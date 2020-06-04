@@ -96,7 +96,7 @@ extern void NVIC_voidEnableAllExternalInterrupt(void);
 extern void NVIC_voidDisableAllExternalInterrupt(void);
 
 extern void NVIC_voidSetBaseInterruptPriority(u8 In_u8Priority);
-extern void NVIC_voidClearBaseInterruptPriority(void)
+extern void NVIC_voidClearBaseInterruptPriority(void);
 
 
 extern void NVIC_voidEnableBusFaultException(void);
@@ -109,6 +109,6 @@ extern void NVIC_voidEnableMemoryFaultException(void);
 extern void NVIC_voidDisableMemoryFaultException(void);
 
 
-extern ErrorStatus NVIC_errSoftWareInterruptEnable(u8 NVIC_Priority)
+extern ErrorStatus NVIC_errSoftWareInterruptEnable(u8 NVIC_Priority);
 
 #endif
