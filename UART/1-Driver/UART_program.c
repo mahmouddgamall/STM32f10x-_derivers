@@ -1,5 +1,5 @@
 /**********************************************************************************************
-Author :Mohamed Ibrahem
+Author :Mohamed Ibrahem, Mahmoud Gamal
 Version:1.0
 Date:12 April 2020
 Description:This Source file is used to interface with the UART module in STM32f10x evaluation kit
@@ -53,11 +53,11 @@ UART_data_t UART_RxBuffer;
 extern const UART_CFG_t UART_cfg [UART_MODULES_NUM];
 
 /*Array of call back function for transmit */
-void (*UART_EndOfJobNotification_Tx[UART_MODULES_NUM])(void);
+static void (*UART_EndOfJobNotification_Tx[UART_MODULES_NUM])(void);
 /*Array of call back function for receive */
-void (*UART_EndOfJobNotification_Rx[UART_MODULES_NUM])(void);
+static void (*UART_EndOfJobNotification_Rx[UART_MODULES_NUM])(void);
 /*	Array of call back function for the LIN break	*/
-void (*UART_LINbreakSequence[UART_MODULES_NUM])(u8);
+static void (*UART_LINbreakSequence[UART_MODULES_NUM])(u8);
 
 
 
@@ -82,20 +82,16 @@ const uint32_t Uart_DMA_RX[UART_MODULES_NUM] = {
 
 
 
-
-
-
-
-
-void UART_voidInitStruct(UART_CFG_t UART_cfg,u32 UART_CHANNEL,u32 sysClk)
+void UART_voidInitStruct(u32 UART_CHANNEL,u32 sysClk)
 {
 	volatile UART_t* UART = ((volatile UART_t*)Uart_Address[UART_CHANNEL]);
+
 	u32 tempCR2 = UART->CR2;
 	u32 tempCR3 = UART->CR3;
 
+	UART_CFG_t*UART_cfg=Get_UART_CnfStruct(UART_CHANNEL);
 
-
-	f64 tmpBaudRate = ((f64)sysClk / ((f64)UART_cfg.BaudRate * 16.0));
+	f64 tmpBaudRate = ((f64)sysClk / ((f64)UART_cfg->BaudRate * 16.0));
 	/* Clear Baudrate Register and set the mantissa */
 	UART->BRR = ((uint32_t)(tmpBaudRate)) << 4;
 	/* Setting the fraction */
@@ -104,22 +100,22 @@ void UART_voidInitStruct(UART_CFG_t UART_cfg,u32 UART_CHANNEL,u32 sysClk)
 
 
 	/*	check if LIN is enabled	*/
-	if(UART_cfg.LINstate == UART_LIN_DISABLE)
+	if(UART_cfg->LINstate == UART_LIN_DISABLE)
 	{
-		if (UART_cfg.Mode == UART_MODE_INTERRUPT)
+		if (UART_cfg->RX_Mode == UART_MODE_INTERRUPT)
 		{
 			/*Enable the UART ,configure the data size,configure the parity ,Enable the rx not empty interrupt,Enable the tx and rx in UART */
-			UART->CR1 =(UART_cfg.DateSize|UART_cfg.Parity|UART_INIT_CONFIG|UART_INTERRUPT_RXNEIE_ENABLE);
+			UART->CR1 =(UART_cfg->DateSize|UART_cfg->Parity|UART_INIT_CONFIG|UART_INTERRUPT_RXNEIE_ENABLE);
 		}
 		else
 		{
 			/*Enable the UART ,configure the data size,configure the parity Enable the tx and rx in UART */
-			UART->CR1 =(UART_cfg.DateSize|UART_cfg.Parity|UART_INIT_CONFIG);
+			UART->CR1 =(UART_cfg->DateSize|UART_cfg->Parity|UART_INIT_CONFIG);
 		}
 		/*Configure number of stop bits */
-		UART->CR2 = UART_cfg.StopBit;
+		UART->CR2 = UART_cfg->StopBit;
 	}
-	else if(UART_cfg.LINstate == UART_LIN_ENABLE)
+	else if(UART_cfg->LINstate == UART_LIN_ENABLE)
 	{
 
 		/*Enable the UART ,configure the data size,configure the parity ,Enable the rx not empty interrupt,Enable the tx and rx in UART */
@@ -174,7 +170,7 @@ void UART_IRQHandler(u32 UART_CHANNEL)
 	else
 	{
 
-		if(UART->SR & UART_STATUS_RXNE)
+		if( (UART->CR1 & UART_INTERRUPT_RXNEIE_ENABLE) && (UART->SR & UART_STATUS_RXNE) )
 		{
 			if(UART_RxBuffer.state == BUSY)
 			{
@@ -199,37 +195,46 @@ void UART_IRQHandler(u32 UART_CHANNEL)
 		/* */
 		if(UART->SR & UART_STATUS_TC)
 		{
-
-			/*Disable the transmit complete interrupt */
-			UART->SR &=UART_INTERRUPT_TCE_DISABLE;
-			/*Call the End of notification call back function */
-			if(UART_EndOfJobNotification_Tx[UART_CHANNEL])
-				UART_EndOfJobNotification_Tx[UART_CHANNEL]();
-		}
-		/*transmit the incoming byte in the data buffer*/
-		if(UART->SR & UART_STATUS_TXE)
-		{
-			if(UART_TxBuffer.position < UART_TxBuffer.size)
+			if(UART_cfg->TX_Mode == UART_MODE_DMA)
 			{
 
-				UART->DR = UART_TxBuffer.data[UART_TxBuffer.position];
-				UART_TxBuffer.position ++;
-
-			}
-			else
-			{
-				/*Rest the data buffer */
-				UART_TxBuffer.state = OK;
-				UART_TxBuffer.data = NULL;
-				UART_TxBuffer.size = 0;
-				UART_TxBuffer.position = 0;
-
-				/*Disable transmit empty interrupt */
-				UART->CR1&=UART_INTERRUPT_TXE_DISABLE;
+				/*Disable the transmit complete interrupt */
+				UART->SR &=UART_INTERRUPT_TCE_DISABLE;
 				/*Call the End of notification call back function */
 				if(UART_EndOfJobNotification_Tx[UART_CHANNEL])
 					UART_EndOfJobNotification_Tx[UART_CHANNEL]();
+
 			}
+		}
+		/*transmit the incoming byte in the data buffer*/
+		if( (UART->CR1 & UART_INTERRUPT_TXE_ENABLE) && (UART->SR & UART_STATUS_TXE) )
+		{
+			if(UART_cfg->TX_Mode == UART_MODE_INTERRUPT)
+			{
+
+				if(UART_TxBuffer.position < UART_TxBuffer.size)
+				{
+
+					UART->DR = UART_TxBuffer.data[UART_TxBuffer.position];
+					UART_TxBuffer.position ++;
+
+				}
+				else
+				{
+					/*Rest the data buffer */
+					UART_TxBuffer.state = OK;
+					UART_TxBuffer.data = NULL;
+					UART_TxBuffer.size = 0;
+					UART_TxBuffer.position = 0;
+
+					/*Disable transmit empty interrupt */
+					UART->CR1&=UART_INTERRUPT_TXE_DISABLE;
+					/*Call the End of notification call back function */
+					if(UART_EndOfJobNotification_Tx[UART_CHANNEL])
+						UART_EndOfJobNotification_Tx[UART_CHANNEL]();
+				}
+			}
+
 
 		}
 	}
@@ -242,125 +247,138 @@ u8 UART_errTransmit(u32 UART_CHANNEL,u8* Copy_pu8Data, u16 Copy_u16Size)
 
 	volatile UART_t* UART = ((volatile UART_t*)Uart_Address[UART_CHANNEL]);
 	u8 Error_s = NULLPOINTER;
-#if UART_MODE == UART_MODE_INTERRUPT
-	/*Check if the pointer points to NULL */
-	if(Copy_pu8Data)
+
+	UART_CFG_t*UART_cfg=Get_UART_CnfStruct(UART_CHANNEL);
+
+	if((Copy_u16Size > 0))
 	{
-		Error_s = BUSY;
-		/*Checkl if the UART is not busy */
-		if(UART_TxBuffer.state == OK)
+
+		if (UART_cfg->TX_Mode == UART_MODE_INTERRUPT)
 		{
-			/*Configure the trasmite data buffer of the  */
-			Error_s = OK;
-			UART_TxBuffer.state = BUSY;
-			UART_TxBuffer.data = Copy_pu8Data;
-			UART_TxBuffer.size = Copy_u16Size;
-			UART->DR = UART_TxBuffer.data[0];
-			UART_TxBuffer.position++;
-			/*Enable the transmit empty interrupt */
-			UART->CR1|=UART_INTERRUPT_TXE_ENABLE;
+			/*Check if the pointer points to NULL */
+			if(Copy_pu8Data)
+			{
+				Error_s = BUSY;
+				/*Checkl if the UART is not busy */
+				if(UART_TxBuffer.state == OK  )
+				{
+					/*Configure the trasmite data buffer of the  */
+					Error_s = OK;
+					UART_TxBuffer.state = BUSY;
+					UART_TxBuffer.data = Copy_pu8Data;
+					UART_TxBuffer.size = Copy_u16Size;
+					UART->DR = UART_TxBuffer.data[0];
+					UART_TxBuffer.position++;
+					/*Enable the transmit empty interrupt */
+					UART->CR1|=UART_INTERRUPT_TXE_ENABLE;
+				}
+			}
+		}
+		else if (UART_cfg->TX_Mode == UART_MODE_DMA)
+		{
+			if(Copy_pu8Data)
+			{
+				Error_s = BUSY;
+				if(UART_TxBuffer.state == OK)
+				{
+					Error_s = OK;
+
+					/*Disable the DMA channel to reset the DMA */
+					DMA_disableChannel(Uart_DMA_TX[UART_CHANNEL]);
+					/*Disable the transfer complete of the DMA */
+					DMA_disableInterrupt(Uart_DMA_TX[UART_CHANNEL],DMA_CCR_INTERRUPT_TCIE);
+					/*Enable the transmit using DMA */
+					UART->CR3 |= UART_DMA_TRANSMIT_ENABLE;
+					/* Configure the peripheral Address of the DMA */
+					DMA_setPeripheralAddress(Uart_DMA_TX[UART_CHANNEL],(u32)&(UART->DR));
+					/* Configure the Memory Address of the DMA */
+					DMA_setMemoryAddress(Uart_DMA_TX[UART_CHANNEL], (u32)Copy_pu8Data);
+					/*Configure number of transfer */
+					DMA_setNumberOfDataTransfer(Uart_DMA_TX[UART_CHANNEL], Copy_u16Size);
+					/*Configure the peripheral size and the memory size ,enable increment in memory and disable the increment in peripheral  */
+					DMA_configureChannel(Uart_DMA_TX[UART_CHANNEL],DMA_CCR_PSIZE_8_BITS, DMA_CCR_PINC_DISABLE ,DMA_CCR_MSIZE_8_BITS, DMA_CCR_MINC_ENABLE);
+					/*Set the direction of the transfer from the array to DR of the UART */
+					DMA_setDirction(Uart_DMA_TX[UART_CHANNEL],DMA_CCR_DIR_FROM_MEMORY);
+					/*Enable the transmit complete interrupt */
+					UART->CR1|=UART_INTERRUPT_TCE_ENABLE;
+					/*Clear the transmit complete */
+					UART->SR &= ~UART_STATUS_TC;
+					/*Start the transfer */
+					DMA_enableChannel(Uart_DMA_TX[UART_CHANNEL]);
+				}
+			}
 		}
 	}
-#elif UART_MODE == UART_MODE_DMA
-	if(Copy_pu8Data)
+	else
 	{
-		Error_s = BUSY;
-		if(UART_TxBuffer.state == OK)
-		{
-			Error_s = OK;
-
-			/*Disable the DMA channel to reset the DMA */
-			DMA_disableChannel(Uart_DMA_TX[UART_CHANNEL]);
-			/*Disable the transfer complete of the DMA */
-			DMA_disableInterrupt(Uart_DMA_TX[UART_CHANNEL],DMA_CCR_INTERRUPT_TCIE);
-			/*Enable the transmit using DMA */
-			UART->CR3 |= UART_DMA_TRANSMIT_ENABLE;
-			/* Configure the peripheral Address of the DMA */
-			DMA_setPeripheralAddress(Uart_DMA_TX[UART_CHANNEL],(u32)&(UART->DR));
-			/* Configure the Memory Address of the DMA */
-			DMA_setMemoryAddress(Uart_DMA_TX[UART_CHANNEL], (u32)Copy_pu8Data);
-			/*Configure number of transfer */
-			DMA_setNumberOfDataTransfer(Uart_DMA_TX[UART_CHANNEL], Copy_u16Size);
-			/*Configure the peripheral size and the memory size ,enable increment in memory and disable the increment in peripheral  */
-			DMA_configureChannel(Uart_DMA_TX[UART_CHANNEL],DMA_CCR_PSIZE_8_BITS, DMA_CCR_PINC_DISABLE ,DMA_CCR_MSIZE_8_BITS, DMA_CCR_MINC_ENABLE);
-			/*Set the direction of the transfer from the array to DR of the UART */
-			DMA_setDirction(Uart_DMA_TX[UART_CHANNEL],DMA_CCR_DIR_FROM_MEMORY);
-			/*Enable the transmit complete interrupt */
-			UART->CR1|=UART_INTERRUPT_TCE_ENABLE;
-			/*Clear the transmit complete */
-			UART->SR &= ~UART_STATUS_TC;
-			/*Start the transfer */
-			DMA_enableChannel(Uart_DMA_TX[UART_CHANNEL]);
-		}
+		Error_s = NOK;
 	}
-
-
-
-
-#else
-#error "UART_MODE is incorrect"
-
-#endif
 	return Error_s;
 }
-
 
 u8 UART_errRecieve(u32 UART_CHANNEL,u8* Copy_pu8Data, u16 Copy_u16Size)
 {
 	volatile UART_t* UART = ((volatile UART_t*)Uart_Address[UART_CHANNEL]);
 	u8 Error_s = NULLPOINTER;
-#if UART_MODE == UART_MODE_INTERRUPT
-	/*Check the pointer points to  NULL */
-	if(Copy_pu8Data)
+	UART_CFG_t*UART_cfg=Get_UART_CnfStruct(UART_CHANNEL);
+	if (Copy_u16Size > 0)
 	{
-		Error_s = BUSY;
-		/*Check if the UART is n't busy */
-		if(UART_RxBuffer.state == OK)
-		{
-			/*Configure the receive data buffer */
-			Error_s = OK;
-			UART_RxBuffer.state = BUSY;
-			UART_RxBuffer.data = Copy_pu8Data;
-			UART_RxBuffer.size = Copy_u16Size;
-			/*Enable the UART receive not empty interrupt */
-			UART->CR1|=UART_INTERRUPT_RXNEIE_ENABLE;
 
+		if (UART_cfg->RX_Mode == UART_MODE_INTERRUPT)
+		{
+			/*Check the pointer points to  NULL */
+			if(Copy_pu8Data)
+			{
+				Error_s = BUSY;
+				/*Check if the UART is n't busy */
+				if((UART_RxBuffer.state == OK) )
+				{
+					/*Configure the receive data buffer */
+					Error_s = OK;
+					UART_RxBuffer.state = BUSY;
+					UART_RxBuffer.data = Copy_pu8Data;
+					UART_RxBuffer.size = Copy_u16Size;
+					/*Enable the UART receive not empty interrupt */
+					UART->CR1|=UART_INTERRUPT_RXNEIE_ENABLE;
+
+				}
+			}
+		}
+		else if (UART_cfg->RX_Mode == UART_MODE_DMA)
+		{
+			if(Copy_pu8Data)
+			{
+				Error_s = BUSY;
+				if(UART_TxBuffer.state == OK)
+				{
+					Error_s = OK;
+
+					/*rest the DMA registers */
+					DMA_disableChannel(Uart_DMA_RX[UART_CHANNEL]);
+					/*Enable transfer complete of the DMA */
+					DMA_enableInterrupt(Uart_DMA_RX[UART_CHANNEL],DMA_CCR_INTERRUPT_TCIE);
+					/*Enable receive using DMA */
+					UART->CR3 |= UART_DMA_RECIEVE_ENABLE;
+					/*Configure the peripheral address to DR of the UART */
+					DMA_setPeripheralAddress(Uart_DMA_RX[UART_CHANNEL], (u32)&(UART->DR));
+					/*Configure the memory address to the array */
+					DMA_setMemoryAddress(Uart_DMA_RX[UART_CHANNEL], (u32)Copy_pu8Data);
+					/*Configure number of transfer of the DMA */
+					DMA_setNumberOfDataTransfer(Uart_DMA_RX[UART_CHANNEL], Copy_u16Size);
+					/*Configure the peripheral size and the memory size ,enable increment in Peripheral  and disable the increment in memory  */
+					DMA_configureChannel(Uart_DMA_RX[UART_CHANNEL],DMA_CCR_PSIZE_8_BITS, DMA_CCR_PINC_DISABLE ,DMA_CCR_MSIZE_8_BITS, DMA_CCR_MINC_ENABLE);
+					/*Configure the direction the DMA from peripheral to the memory */
+					DMA_setDirction(Uart_DMA_RX[UART_CHANNEL],DMA_CCR_DIR_FROM_PERIPHERAL);
+					/*Start transfer */
+					DMA_enableChannel(Uart_DMA_RX[UART_CHANNEL]);
+				}
+			}
 		}
 	}
-
-#elif UART_MODE == UART_MODE_DMA
-	if(Copy_pu8Data)
+	else
 	{
-		Error_s = BUSY;
-		if(UART_TxBuffer.state == OK)
-		{
-			Error_s = OK;
-
-			/*rest the DMA registers */
-			DMA_disableChannel(Uart_DMA_RX[UART_CHANNEL]);
-			/*Enable transfer complete of the DMA */
-			DMA_enableInterrupt(Uart_DMA_RX[UART_CHANNEL],DMA_CCR_INTERRUPT_TCIE);
-			/*Enable receive using DMA */
-			UART->CR3 |= UART_DMA_RECIEVE_ENABLE;
-			/*Configure the peripheral address to DR of the UART */
-			DMA_setPeripheralAddress(Uart_DMA_RX[UART_CHANNEL], (u32)&(UART->DR));
-			/*Configure the memory address to the array */
-			DMA_setMemoryAddress(Uart_DMA_RX[UART_CHANNEL], (u32)Copy_pu8Data);
-			/*Configure number of transfer of the DMA */
-			DMA_setNumberOfDataTransfer(Uart_DMA_RX[UART_CHANNEL], Copy_u16Size);
-			/*Configure the peripheral size and the memory size ,enable increment in Peripheral  and disable the increment in memory  */
-			DMA_configureChannel(Uart_DMA_RX[UART_CHANNEL],DMA_CCR_PSIZE_8_BITS, DMA_CCR_PINC_DISABLE ,DMA_CCR_MSIZE_8_BITS, DMA_CCR_MINC_ENABLE);
-			/*Configure the direction the DMA from peripheral to the memory */
-			DMA_setDirction(Uart_DMA_RX[UART_CHANNEL],DMA_CCR_DIR_FROM_PERIPHERAL);
-			/*Start transfer */
-			DMA_enableChannel(Uart_DMA_RX[UART_CHANNEL]);
-		}
+		Error_s = NOK;
 	}
-
-#else
-#error "UART_RECIEVE_MODE is incorrect"
-
-#endif
 	return Error_s;
 }
 
@@ -385,13 +403,11 @@ u8 UART_errSetCallBackRecieve(u32 UART_CHANNEL, UART_callBack_t UART_callBack)
 	if(UART_callBack)
 	{
 		Error_st = OK;
-#if UART_MODE == UART_MODE_INTERRUPT
-		UART_EndOfJobNotification_Rx[UART_CHANNEL] = UART_callBack;
-#elif UART_MODE == UART_MODE_DMA
-		DMA_setCBF_EndOfTransfer(Uart_DMA_RX[UART_CHANNEL],UART_callBack);
-#else
-#error "UART_SEND_MODE is incorrect"
-#endif
+		UART_CFG_t*UART_cfg=Get_UART_CnfStruct(UART_CHANNEL);
+		if (UART_cfg->RX_Mode == UART_MODE_INTERRUPT)
+			UART_EndOfJobNotification_Rx[UART_CHANNEL] = UART_callBack;
+		else if (UART_cfg->RX_Mode == UART_MODE_DMA)
+			DMA_setCBF_EndOfTransfer(Uart_DMA_RX[UART_CHANNEL],UART_callBack);
 	}
 	return Error_st;
 }
