@@ -10,7 +10,7 @@
 #define ELF_PT_R 0x2
 #define ELF_PT_W 0x4
 
-#define COM_PORT_NAME "\\\\.\\COM10"
+#define COM_PORT_NAME "\\\\.\\COMxx"
 
 
 #define PAGE_SIZE       1024
@@ -22,7 +22,7 @@
 
 
 #define     APP_FLASH_SIZE              0x5800      
-#define     APP1_FLASH_ADDRESS          0x08005000      
+#define     APP1_FLASH_ADDRESS          0x08003C00      
 #define     APP2_FLASH_ADDRESS          0x08008000  
 
 #define     BL_VERIFY_OK                0x55
@@ -30,20 +30,7 @@
 
 #define ROM_SIZE     65536
 
-u8 DataToBeSend[ROM_SIZE]={0};
-u32 Data_Position        =0;
-u32 DataSendingPosition        =0;
-
-void delay(void)
-{
-
-	for (int i=0;i<1000000;i++)
-	{
-		for (int j=0;j<300;j++);
-	}
-
-}
-
+#define  SIZE  1024*1024
 
 
 typedef struct __attribute__((packed))
@@ -60,9 +47,6 @@ typedef struct __attribute__((packed))
 	u16 fileSize;
 	BL_comm_header_t BL_comm_header;
 }new_app_t;
-
-
-
 
 
 typedef struct 
@@ -96,15 +80,200 @@ typedef struct __attribute__((packed))
 }elf_phead;
 
 
-int G_fileSize=0;
-HANDLE hComm; 
-FILE *fpw;
+
 
 void flashNewApp(void);
 void sendHeader(u16 counter, u8 cmd);
 void sendpage(void);
 
-char   ComPortName[] = COM_PORT_NAME; // Name of the Serial port(May Change) to be opened,
+void MAIN_initComm(void);
+
+void MAIN_sendComm(char *buffer, int size);
+void MAIN_readComm(char * buffer);
+
+int is_elf(elf_header *elf);
+void load_elf_segment(uint8_t *data, elf_phead *phead);
+
+int load_elf(uint8_t *data);
+
+
+u8 DataToBeSend[ROM_SIZE]={0};
+u32 Data_Position        =0;
+u32 DataSendingPosition        =0;
+
+
+int G_fileSize=0;
+HANDLE hComm; 
+uint32_t filepos;
+uint32_t filesize;
+
+char  ComPortName[13]; // Name of the Serial port(May Change) to be opened,
+
+FILE *python; 
+
+u8 buffer[SIZE];
+
+void main(int argc,char* argv[])
+{
+
+	u8 idx;
+	u8 responseBuffer;
+	char file_name[30];
+	char filename[30];
+	FILE *fd; 
+	elf_header * Header;
+	u8 writeCounter=0;
+	u8 maxCount;
+	u8 header_error=0;
+	char com[5];
+	int installationFlag = 1;
+	strcpy(ComPortName, COM_PORT_NAME);
+	if(argc > 1)
+	{
+		strcpy(file_name, argv[1]);
+
+		printf("%s\n", file_name);
+
+
+		if(argv[2][3] == '1')
+		{
+			ComPortName[7] = argv[2][3] ;		
+			ComPortName[8] = argv[2][4] ;
+		}
+		else
+		{
+			ComPortName[7] = argv[2][3] ;	
+		}
+
+
+
+
+	}
+	else if( argc == 1)
+	{
+		printf("enter file name: ");
+		scanf("%s",filename);
+		strcpy(file_name, filename);
+
+		printf("enter COM number: ");
+		scanf("%s",com);
+
+		if(com[3] == '1')
+		{
+			ComPortName[7] = com[3] ;		
+			ComPortName[8] = com[4] ;
+		}
+		else
+		{
+			ComPortName[7] = com[3] ;	
+		}
+
+	}
+
+	MAIN_initComm();
+
+	fd = fopen(file_name, "r");
+	if(fd)
+	{
+		fread(buffer,SIZE, 1,fd);
+		load_elf(buffer);
+	}
+
+
+
+	flashNewApp()  ;
+	maxCount = G_fileSize/PAGE_SIZE;
+	if(G_fileSize%PAGE_SIZE)
+	{
+		maxCount++;
+	}
+	while(writeCounter<maxCount)
+	{
+		MAIN_readComm((char*)&responseBuffer);  //rx response  
+		if( responseBuffer == BL_VERIFY_OK)
+		{
+			sendHeader(writeCounter++,BL_CMD_WRITE_SECTOR);
+			MAIN_readComm((char*)&responseBuffer);  //rx response  
+			if( responseBuffer == BL_VERIFY_OK)
+			{
+				sendpage();    //send 1024
+				DataSendingPosition +=PAGE_SIZE;
+			}
+			else
+			{
+				printf("\ncouldn't send bootloader\n");
+				header_error = 1;
+				installationFlag = 0;
+				break;
+			}
+
+		}
+
+		else
+		{
+			printf("\ncouldn't send bootloader\n");
+			installationFlag = 0;
+			break;
+		}
+		if(header_error == 1)
+		{
+			break;
+		}
+
+	}
+
+	fclose(fd);
+
+	CloseHandle(hComm);							//Closing the Serial Port
+	if(installationFlag == 1)
+		printf("\n\tYour Application is now installed :D\n");
+	printf("\n ==========================================\n");
+
+
+}
+
+
+void flashNewApp(void)
+{
+	printf("\n\tInstalling Application...\n");
+	new_app_t new_app;
+	new_app.BL_comm_header.req_counter=1           ; 
+	new_app.BL_comm_header.cmd=BL_CMD_FLASH_NEW_APP; //1
+	new_app.baseAddress = APP1_FLASH_ADDRESS; //0x08005000 
+	printf("\n- The files size is %d bytes\n", G_fileSize);
+	new_app.fileSize = G_fileSize; 
+
+	MAIN_sendComm((char * )&new_app,(u16)sizeof(new_app_t));
+}
+
+void sendHeader(u16 counter, u8 cmd)
+{
+
+	BL_comm_header_t BL_comm_header={
+			.req_counter = counter,
+			.cmd = cmd
+	};
+
+	/*	those three lines are for the GUI	*/
+	python = fopen("GUI.txt", "w");
+	fprintf(python,"%d", G_fileSize);
+	fprintf(python,"\n%d", counter);
+	fclose(python);
+	
+	printf("\n- %d KB has been sent \n", counter);
+	MAIN_sendComm((char * )&BL_comm_header,(u16)sizeof(BL_comm_header_t));
+}
+
+void sendpage(void)
+{
+
+	int count = 0;
+	char ch;
+
+
+	MAIN_sendComm((char*)(&DataToBeSend[DataSendingPosition]),PAGE_SIZE);
+}
+
 
 void MAIN_initComm(void)
 {
@@ -114,160 +283,137 @@ void MAIN_initComm(void)
 	printf("\n\n +==========================================+");
 	printf("\n |  Serial Transmission (Win32 API)         |");
 	printf("\n +==========================================+\n");
-    /*----------------------------------- Opening the Serial Port --------------------------------------------*/
+	/*----------------------------------- Opening the Serial Port --------------------------------------------*/
 
-    hComm = CreateFile( ComPortName,                       // Name of the Port to be Opened
-            GENERIC_READ | GENERIC_WRITE,      // Read/Write Access
-            0,                                 // No Sharing, ports cant be shared
-            NULL,                              // No Security
-            OPEN_EXISTING,                     // Open existing port only
-            0,                                 // Non Overlapped I/O
-            NULL);                             // Null for Comm Devices
+	hComm = CreateFile( ComPortName,                       // Name of the Port to be Opened
+			GENERIC_READ | GENERIC_WRITE,      // Read/Write Access
+			0,                                 // No Sharing, ports cant be shared
+			NULL,                              // No Security
+			OPEN_EXISTING,                     // Open existing port only
+			0,                                 // Non Overlapped I/O
+			NULL);                             // Null for Comm Devices
 
-    if (hComm == INVALID_HANDLE_VALUE)
-    	printf("\n   Error! - Port %s can't be opened", ComPortName);
-    else 
-    	printf("\n   Port %s Opened\n ", ComPortName);
+	if (hComm == INVALID_HANDLE_VALUE)
+		printf("\n   Error! - Port %s can't be opened", ComPortName);
+	else 
+		printf("\n   Port %s Opened\n ", ComPortName);
 
 
-    /*------------------------------- Setting the Parameters for the SerialPort ------------------------------*/
+	/*------------------------------- Setting the Parameters for the SerialPort ------------------------------*/
 
-    DCB dcbSerialParams = { 0 };                        // Initializing DCB structure
-    dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
+	DCB dcbSerialParams = { 0 };                        // Initializing DCB structure
+	dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
 
-    Status = GetCommState(hComm, &dcbSerialParams);     //retreives  the current settings
+	Status = GetCommState(hComm, &dcbSerialParams);     //retreives  the current settings
 
-    if (Status == FALSE)
-    	printf("\n   Error! in GetCommState()");
+	if (Status == FALSE)
+		printf("\n   Error! in GetCommState()");
 
-    dcbSerialParams.BaudRate = CBR_9600;      // Setting BaudRate = 9600
-    dcbSerialParams.ByteSize = 8;             // Setting ByteSize = 8
-    dcbSerialParams.StopBits = ONESTOPBIT;    // Setting StopBits = 1
-    dcbSerialParams.Parity   = NOPARITY;      // Setting Parity = None 
+	dcbSerialParams.BaudRate = CBR_115200;      // Setting BaudRate = 115200
+	dcbSerialParams.ByteSize = 8;             // Setting ByteSize = 8
+	dcbSerialParams.StopBits = ONESTOPBIT;    // Setting StopBits = 1
+	dcbSerialParams.Parity   = NOPARITY;      // Setting Parity = None 
 
-    Status = SetCommState(hComm, &dcbSerialParams);  //Configuring the port according to settings in DCB 
+	Status = SetCommState(hComm, &dcbSerialParams);  //Configuring the port according to settings in DCB 
 
-    if (Status == FALSE)
-    {
-    	printf("\n   Error! in Setting DCB Structure");
-    }
-    else
-    {
-    	printf("\n   Setting DCB Structure Successfull\n");
-    	printf("\n       Baudrate = %d", dcbSerialParams.BaudRate);
-    	printf("\n       ByteSize = %d", dcbSerialParams.ByteSize);
-    	printf("\n       StopBits = %d", dcbSerialParams.StopBits);
-    	printf("\n       Parity   = %d", dcbSerialParams.Parity);
-    }
+	if (Status == FALSE)
+	{
+		printf("\n   Error! in Setting DCB Structure");
+	}
+	else
+	{
+		printf("\n   Setting DCB Structure Successfull\n");
+		printf("\n       Baudrate = %d", dcbSerialParams.BaudRate);
+		printf("\n       ByteSize = %d", dcbSerialParams.ByteSize);
+		printf("\n       StopBits = %d", dcbSerialParams.StopBits);
+		printf("\n       Parity   = %d", dcbSerialParams.Parity);
+	}
 
-    /*------------------------------------ Setting Timeouts --------------------------------------------------*/
+	/*------------------------------------ Setting Timeouts --------------------------------------------------*/
 
-    COMMTIMEOUTS timeouts = { 0 };
-    timeouts.ReadIntervalTimeout         = 50;
-    timeouts.ReadTotalTimeoutConstant    = 50;
-    timeouts.ReadTotalTimeoutMultiplier  = 10;
-    timeouts.WriteTotalTimeoutConstant   = 50;
-    timeouts.WriteTotalTimeoutMultiplier = 10;
+	COMMTIMEOUTS timeouts = { 0 };
+	timeouts.ReadIntervalTimeout         = 50;
+	timeouts.ReadTotalTimeoutConstant    = 50;
+	timeouts.ReadTotalTimeoutMultiplier  = 10;
+	timeouts.WriteTotalTimeoutConstant   = 50;
+	timeouts.WriteTotalTimeoutMultiplier = 10;
 
-    if (SetCommTimeouts(hComm, &timeouts) == FALSE)
-    	printf("\n   Error! in Setting Time Outs");
-    else
-    	printf("\n\n   Setting Serial Port Timeouts Successfull");
+	if (SetCommTimeouts(hComm, &timeouts) == FALSE)
+		printf("\n   Error! in Setting Time Outs");
+	else
+		printf("\n\n   Setting Serial Port Timeouts Successfull");
 }
 
-void MAIN_sendComm(char *buffer, u16 size)
+
+void MAIN_sendComm(char *buffer, int size)
 {
-	delay();
-	delay();
-	//MAIN_initComm();
-	printf("\n\n\nsending...\n\n\n\n");
+
 	BOOL   Status;
-    DWORD  dNoOFBytestoWrite;              // No of bytes to write into the port
-    DWORD  dNoOfBytesWritten = 0;          // No of bytes written to the port
-    dNoOFBytestoWrite = size; // Calculating the no of bytes to write into the port
-    int success=FlushFileBuffers(hComm);
-    if (!success)
-    {
-    	printf("\n\n\n Failed to flush\n");
-    }
-        Status = WriteFile(hComm,               // Handle to the Serialport
-                buffer,            // Data to be written to the port 
-                dNoOFBytestoWrite,   // No of bytes to write into the port
-                &dNoOfBytesWritten,  // No of bytes written to the port
-                NULL);
-		//int success=FlushFileBuffers(hComm);
-		//if (!success)
-		//{
-		//	printf("\n\n\n Failed to flush\n");
-		//}
-        //  if (Status == TRUE)
-         //   printf("\n\n    %s - Written to %s", buffer, ComPortName);
-         //   printf("\n\n    %s - Written to %s", buffer, ComPortName);
-         //   printf("\n\n    %s - Written to %s", buffer, ComPortName);
-         //   printf("\n\n    %s - Written to %s", buffer, ComPortName);
-        //else
-         //   printf("\n\n   Error %d in Writing to Serial Port",GetLastError());
+	DWORD  dNoOFBytestoWrite;              // No of bytes to write into the port
+	DWORD  dNoOfBytesWritten = 0;          // No of bytes written to the port
+	dNoOFBytestoWrite = size; // Calculating the no of bytes to write into the port
+	int success=FlushFileBuffers(hComm);
+	if (!success)
+	{
+		printf("\n\n\n Failed to flush\n");
+	}
+	Status = WriteFile(hComm,               // Handle to the Serialport
+			buffer,            // Data to be written to the port 
+			dNoOFBytestoWrite,   // No of bytes to write into the port
+			&dNoOfBytesWritten,  // No of bytes written to the port
+			NULL);
 
-        printf("\n\n\ndata is sent\n\n");
-	//CloseHandle(hComm);//Closing the Serial Port
 
-    }
+}
 
-    void MAIN_readComm(char * buffer)
-    {
-	//MAIN_initComm();
-    /*------------------------------------ Setting Timeouts --------------------------------------------------*/
-    	printf("receiving...\n");
+void MAIN_readComm(char * buffer)
+{
+	/*------------------------------------ Setting Timeouts --------------------------------------------------*/
 
-    	BOOL   Status;
-    DWORD dwEventMask;                     // Event mask to trigger
-    char  TempChar;                        // Temperory Character
-    int i = 0;
+	BOOL   Status;
+	DWORD dwEventMask;                     // Event mask to trigger
+	char  TempChar;                        // Temperory Character
+	int i = 0;
 
-    DWORD NoBytesRead;                     // Bytes read by ReadFile()
+	DWORD NoBytesRead;                     // Bytes read by ReadFile()
 
-    /*------------------------------------ Setting Receive Mask ----------------------------------------------*/
+	/*------------------------------------ Setting Receive Mask ----------------------------------------------*/
 
-    Status = SetCommMask(hComm, EV_RXCHAR); //Configure Windows to Monitor the serial device for Character Reception
-    if (Status == FALSE)
-    	printf("\n\n    Error! in Setting CommMask");
-    else
-    	printf("\n\n    Setting CommMask successfull");
-    /*------------------------------------ Setting WaitComm() Event   ----------------------------------------*/
+	Status = SetCommMask(hComm, EV_RXCHAR); //Configure Windows to Monitor the serial device for Character Reception
+	if (Status == FALSE)
+		printf("\n\n    Error! in Setting CommMask");
+	else
+		//printf("\n\n    Setting CommMask successfull");
+	/*------------------------------------ Setting WaitComm() Event   ----------------------------------------*/
 
-    printf("\n\n    Waiting for Data Reception");
 
-    Status = WaitCommEvent(hComm, &dwEventMask, NULL); //Wait for the character to be received
-    /*-------------------------- Program will Wait here till a Character is received ------------------------*/             
-    if (Status == FALSE)
-    {
-    	printf("\n    Error! in Setting WaitCommEvent()");
-    }
-    else //If  WaitCommEvent()==True Read the RXed data using ReadFile();
-    {
-    	int success=FlushFileBuffers(hComm);
-    	if (!success)
-    	{
-    		printf("\n\n\n Failed to flush\n");
-    	}
+	Status = WaitCommEvent(hComm, &dwEventMask, NULL); //Wait for the character to be received
+	/*-------------------------- Program will Wait here till a Character is received ------------------------*/             
+	if (Status == FALSE)
+	{
+		printf("\n    Error! in Setting WaitCommEvent()");
+	}
+	else //If  WaitCommEvent()==True Read the RXed data using ReadFile();
+	{
+		int success=FlushFileBuffers(hComm);
+		if (!success)
+		{
+			printf("\n\n\n Failed to flush\n");
+		}
 
-    	success=FlushFileBuffers(hComm);
-    	if (!success)
-    	{
-    		printf("\n\n\n Failed to flush\n");
-    	}
-    	printf("\n\n    Characters Received\n\n" );
-    	do
-    	{
-    		Status = ReadFile(hComm, &TempChar, sizeof(TempChar), &NoBytesRead, NULL);
-    		buffer[i] = TempChar;
-    		printf("%x\n",buffer[i]);
-    		i++;
-    	}
-    	while (NoBytesRead > 0);
-    }
-    printf("data is recieved\n");
-    //CloseHandle(hComm);//Closing the Serial Port
+		success=FlushFileBuffers(hComm);
+		if (!success)
+		{
+			printf("\n\n\n Failed to flush\n");
+		}
+		do
+		{
+			Status = ReadFile(hComm, &TempChar, sizeof(TempChar), &NoBytesRead, NULL);
+			buffer[i] = TempChar;
+			i++;
+		}
+		while (NoBytesRead > 0);
+	}
 
 }
 
@@ -278,40 +424,62 @@ int is_elf(elf_header *elf)
 
 	int iself = -1;
 	if((elf-> identity[0] == 0x7f) && \
-		!strncmp((char *)&elf->identity[1], "ELF", 3))
+			!strncmp((char *)&elf->identity[1], "ELF", 3))
 	{
 		iself = 0;
-		printf("Is elf\n");
 	}
 	if(iself != -1)
 		iself = elf->type;
 	return iself;
 }
-uint32_t filepos;
-uint32_t filesize;
+
 
 void load_elf_segment(uint8_t *data, elf_phead *phead)
 {
-    uint32_t memsize = phead->mem_size;         // Size in memory
-    uint32_t filesize = phead->file_size;      // Size in file
-    uint32_t mempos = phead->virtual_address; // Offset in memory
-    filepos = phead->offset;         // Offset in file
-    u32 index;
-    static u32 counter = 0;
+	static int enteranceFlag = 0;
+	static int lastFileSize = 0;
+	static int lastPhysicalAddress = 0;
+	static u32 counter = 0;
 
-    fpw = fopen("newfile.txt","a");
+	uint32_t memsize = phead->mem_size;         // Size in memory
+	uint32_t filesize = phead->file_size;      // Size in file
+	uint32_t mempos = phead->virtual_address; // Offset in memory
+	filepos = phead->offset;       			  // Offset in file
+	u32 index;
 
-    printf("\n-\n-\n-\n-\n%d\n-\n-\n-\n-\n-\n", data[filepos]);
 
-    for ( index=0;index < filesize ;index++)
-    {
-    	DataToBeSend[Data_Position++] = data[filepos+index];
-    	fprintf(fpw,"%02x",data[filepos+index]);
+	if(enteranceFlag == 0)
+	{
+		enteranceFlag++;
+		lastPhysicalAddress = phead->physical_address;
+		lastFileSize = phead->file_size; 
+	}
+	else
+	{
+		if(phead->physical_address<0x20000000)
+		{
+			int diff = phead->physical_address - (lastPhysicalAddress + lastFileSize);
+			if(diff<0)
+			{
+				printf("\ndiff is smaller than 0\n");
+			}
+			for(int padding = 0; padding < diff; padding ++)
+			{	
+				DataToBeSend[Data_Position++]=0xFF;
+				G_fileSize++;
+			}	
 
-    }
-    DataToBeSend[Data_Position++]=0;
+			lastPhysicalAddress = phead->physical_address;
+			lastFileSize = phead->file_size; 
+		}
+	}
 
-    fclose(fpw);
+	for ( index=0;index < filesize ;index++)
+	{
+		DataToBeSend[Data_Position++] = data[filepos+index];
+
+	}
+
 }
 
 int load_elf(uint8_t *data)
@@ -325,126 +493,10 @@ int load_elf(uint8_t *data)
 	{
 		if(phead[i].type == ELF_PT_LOAD)
 		{
-
 			G_fileSize+=phead[i].mem_size;
-
 			load_elf_segment(data, &phead[i]);
 		}
 	}
-	G_fileSize++;
 	return 0;
 }
 
-#define  size  1024*1024
-
-u8 buffer[size];
-
-void main(void)
-{
-	fpw = fopen("newfile.txt","w");
-	fprintf(fpw,"%02x",0);
-	MAIN_initComm();
-	u8 idx;
-	u8 responseBuffer;
-	char file_name[30]="BlinkLed.elf";
-
-	FILE *fd; 
-	fd = fopen(file_name, "r");
-	elf_header * Header;
-	u8 writeCounter=0;
-	u8 maxCount;
-	u8 header_error=0;
-	if(fd)
-	{
-		fread(buffer,size, 1,fd);
-		load_elf(buffer);
-	}
-
-
-
-	flashNewApp()  ;
-	maxCount = G_fileSize/PAGE_SIZE;
-	if(G_fileSize%PAGE_SIZE)
-	{
-		maxCount++;
-	}
-	printf("\n\n\n\n\n%d\n\n\n\n", maxCount);
-	while(writeCounter<maxCount)
-	{
-        MAIN_readComm((char*)&responseBuffer);  //rx response  
-        if( responseBuffer == BL_VERIFY_OK)
-        {
-        	printf("\n\n\n\n%d\n\n\n\n\n",writeCounter);
-        	sendHeader(writeCounter++,BL_CMD_WRITE_SECTOR);
-             MAIN_readComm((char*)&responseBuffer);  //rx response  
-             printf("\n\n\n\n%d",responseBuffer);
-             if( responseBuffer == BL_VERIFY_OK)
-             {
-			sendpage();    //send 1024
-			DataSendingPosition +=PAGE_SIZE;
-		}
-		else
-		{
-			printf("\ncouldn't send bootloader\n");
-			header_error = 1;
-			break;
-		}
-
-	}
-
-	else
-	{
-		printf("\ncouldn't send bootloader\n");
-		break;
-	}
-	if(header_error == 1)
-	{
-		break;
-	}
-
-}
-
-
-fclose(fd);
-fclose(fpw);
-    //CloseHandle(hComm);//Closing the Serial Port
-printf("\n ==========================================\n");
-}
-
-
-void flashNewApp(void)
-{
-	printf("sending new app initalizer\n");
-	new_app_t new_app;
-	new_app.BL_comm_header.req_counter=1           ; 
-    new_app.BL_comm_header.cmd=BL_CMD_FLASH_NEW_APP; //1
-    new_app.baseAddress = APP1_FLASH_ADDRESS; //0x08005000 
-    new_app.fileSize = G_fileSize; 
-
-    MAIN_sendComm((char * )&new_app,(u16)sizeof(new_app_t));
-}
-
-void sendHeader(u16 counter, u8 cmd)
-{
-	printf("sending header\n");
-
-	BL_comm_header_t BL_comm_header={
-		.req_counter = counter,
-		.cmd = cmd
-	};
-	MAIN_sendComm((char * )&BL_comm_header,(u16)sizeof(BL_comm_header_t));
-}
-
-void sendpage(void)
-{
-
-	printf("\n\n\n\nsending a page\n\n\n\n");
-	int count = 0;
-	char ch;
-
-//for (u16 i=0;i<1024;i++)
-//{
-	//printf("%x",DataToBeSend[i]);
-//}
-	MAIN_sendComm((char*)(&DataToBeSend[DataSendingPosition]),PAGE_SIZE);
-}
