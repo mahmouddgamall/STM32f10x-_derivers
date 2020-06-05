@@ -10,7 +10,7 @@
 #define ELF_PT_R 0x2
 #define ELF_PT_W 0x4
 
-#define COM_PORT_NAME "\\\\.\\COMxx"
+#define COM_PORT_NAME "\\\\.\\COM"
 
 
 #define PAGE_SIZE       1024
@@ -121,6 +121,7 @@ void main(int argc,char* argv[])
 	char file_name[30];
 	char filename[30];
 	FILE *fd; 
+	FILE *gui; 
 	elf_header * Header;
 	u8 writeCounter=0;
 	u8 maxCount;
@@ -225,11 +226,17 @@ void main(int argc,char* argv[])
 	fclose(fd);
 
 	CloseHandle(hComm);							//Closing the Serial Port
-	if(installationFlag == 1)
+	gui = fopen("GUI.txt", "w");
+	if(installationFlag == 1){
 		printf("\n\tYour Application is now installed :D\n");
+		fprintf(gui,"%s","Your Application is now installed :D");
+	}
+	else {
+		fprintf(gui,"%s","couldn't send bootloader");
+		
+	}
+	fclose(gui);
 	printf("\n ==========================================\n");
-
-
 }
 
 
@@ -255,11 +262,7 @@ void sendHeader(u16 counter, u8 cmd)
 	};
 
 	/*	those three lines are for the GUI	*/
-	python = fopen("GUI.txt", "w");
-	fprintf(python,"%d", G_fileSize);
-	fprintf(python,"\n%d", counter);
-	fclose(python);
-	
+
 	printf("\n- %d KB has been sent \n", counter);
 	MAIN_sendComm((char * )&BL_comm_header,(u16)sizeof(BL_comm_header_t));
 }

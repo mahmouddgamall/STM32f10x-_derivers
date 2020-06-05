@@ -52,6 +52,10 @@ class Ui_Form(object):
         self.pathLbl = QLabel(Form)
         self.pathLbl.setObjectName(u"pathLbl")
         self.pathLbl.setGeometry(QRect(20, 140, 131, 21))
+        self.pathLb2 = QLabel(Form)
+        self.pathLb2.setObjectName(u"pathLb2")
+        self.pathLb2.setGeometry(QRect(250, 270, 200, 21))
+        
         self.CreateButton = QPushButton(Form)
         self.CreateButton.setObjectName(u"CreateButton")
         self.CreateButton.setGeometry(QRect(220, 310, 181, 41))
@@ -92,6 +96,7 @@ class Ui_Form(object):
 
         self.SelectButton.setText(QCoreApplication.translate("Form", u"Select", None))
         self.pathLbl.setText(QCoreApplication.translate("Form", u"Input File Path", None))
+        self.pathLb2.setText(QCoreApplication.translate("Form", u" ", None))
         self.CreateButton.setText(QCoreApplication.translate("Form", u"Flash New Aplication", None))
     # retranslateUi
     def FlashNewAppFunction(self):
@@ -102,21 +107,12 @@ class Ui_Form(object):
        else:
            print(self.pathTxt.text())
            #call C appication
+           self.progressBar.setValue(20)
            os.system("ELF.exe "+self.pathTxt.text()+" "+self.PinSelect_comboBox.currentText())
-       while(1):
-           self.progressBar.setValue(0)
-           file1 = open("GUI.txt","r+")
-           first_line = file1.readline()
-           second_line = file1.readline()
-           if ((int(first_line)!=0) and (int(first_line) != int(second_line))):
-               self.progressBar.setValue(((int(second_line)*1000)/(int(first_line)))*100)
-               print((int(first_line)/(int(second_line)*1000))*100)
-               file1.close() 
-           if (first_line >= second_line):
-               file1.close() 
-               break
-
-
+           self.progressBar.setValue(100)
+           f = open("gui.txt", "r")
+           #print(f.readline())
+           self.pathLb2.setText(QCoreApplication.translate("Form", f.readline(), None))
 
 app =QApplication(sys.argv)
 Widget=QWidget()
